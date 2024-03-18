@@ -1,10 +1,10 @@
 'use server';
 import { z } from 'zod';
-import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
+import { db } from '@/db';
 
 export async function authenticate(
   prevState: string | undefined,
@@ -69,14 +69,18 @@ export async function createInvoice(prevState: State, formData: FormData) {
   // Prepare data for insertion into the database
   const { customerId, amount, status } = validatedFields.data;
   const amountInCents = amount * 100;
-  const date = new Date().toISOString().split('T')[0];
+  const date = new Date().toISOString();
  
   // Insert data into the database
   try {
-    await sql`
-      INSERT INTO invoices (customer_id, amount, status, date)
-      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-    `;
+    await db.invoices.create({
+      data: {
+        customer_id: customerId,
+        amount: amountInCents,
+        status,
+        date
+      }
+    })
   } catch (error) {
     // If a database error occurs, return a more specific error.
     return {
@@ -116,11 +120,16 @@ export async function updateInvoice(
   const amountInCents = amount * 100;
  
   try {
-    await sql`
-      UPDATE invoices
-      SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
-      WHERE id = ${id}
-    `;
+    await db.invoices.updateMany({
+      data: {
+        customer_id: customerId,
+        amount: amountInCents,
+        status
+      },
+      where: {
+        id
+      }
+    })
   } catch (error) {
     return { message: 'Database Error: Failed to Update Invoice.' };
   }
@@ -131,7 +140,11 @@ export async function updateInvoice(
 
   export async function deleteInvoice(id: string) {
     try {
-      await sql`DELETE FROM invoices WHERE id = ${id}`;
+      await db.invoices.deleteMany({
+        where: {
+          id
+        }
+      })
       revalidatePath('/dashboard/invoices');
       return { message: 'Deleted Invoice.' };
     } catch (error) {
