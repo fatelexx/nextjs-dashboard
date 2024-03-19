@@ -75,7 +75,11 @@ export async function createInvoice(prevState: State, formData: FormData) {
   try {
     await db.invoices.create({
       data: {
-        customer_id: customerId,
+        customer: {
+          connect: {
+            id: customerId
+          }
+        },
         amount: amountInCents,
         status,
         date

@@ -36,14 +36,32 @@ export async function fetchRevenue() {
 export async function fetchLatestInvoices() {
   noStore();
   try {
-    const data = await sql<LatestInvoiceRaw>`
-      SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      ORDER BY invoices.date DESC
-      LIMIT 5`;
+      const dataFromDb = (await db.invoices.findMany({
+        orderBy: {
+          date: 'desc'
+        },
+        take: 5,
+        select: {
+          amount: true,
+          customer: {
+            select: {
+              name: true,
+              image_url: true,
+              email: true
+            }
+          },
+          id: true
+        },
+      }));
+      const data: LatestInvoiceRaw[] = dataFromDb.map<LatestInvoiceRaw>(x => ({
+        amount: x.amount,
+        email: x.customer.email,
+        id: x.id,
+        image_url: x.customer.image_url,
+        name: x.customer.name
+      } as LatestInvoiceRaw));
 
-    const latestInvoices = data.rows.map((invoice) => ({
+    const latestInvoices = data.map((invoice) => ({
       ...invoice,
       amount: formatCurrency(invoice.amount),
     }));
