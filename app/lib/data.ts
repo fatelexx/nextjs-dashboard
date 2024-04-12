@@ -12,6 +12,11 @@ import { formatCurrency } from './utils';
 import { unstable_noStore as noStore } from 'next/cache';
 import {db} from '../../db';
 
+type InvoiceStatus = {
+  paid: bigint;
+  pending: bigint;
+}
+
 export async function fetchRevenue() {
   // Add noStore() here prevent the response from being cached.
   // This is equivalent to in fetch(..., {cache: 'no-store'}).
@@ -80,10 +85,12 @@ export async function fetchCardData() {
     // how to initialize multiple queries in parallel with JS.
     const invoiceCountPromise = db.invoices.count();
     const customerCountPromise = db.customers.count();
-    const invoiceStatusPromise = sql`SELECT
-         SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
-         SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-         FROM invoices`;
+    const invoiceStatusPromise = await db.$queryRaw<InvoiceStatus[]>`
+      SELECT
+      SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
+      SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
+      FROM "public"."invoices"
+      `;
 
     const [invoiceCount, customerCount, invoiceStatus] = await Promise.all([
       invoiceCountPromise,
@@ -91,10 +98,12 @@ export async function fetchCardData() {
       invoiceStatusPromise,
     ]);
 
+    const [first] = invoiceStatus;
+
     const numberOfInvoices = Number(invoiceCount ?? '0');
     const numberOfCustomers = Number(customerCount ?? '0');
-    const totalPaidInvoices = formatCurrency(invoiceStatus.rows[0].paid ?? '0');
-    const totalPendingInvoices = formatCurrency(invoiceStatus.rows[0].pending ?? '0');
+    const totalPaidInvoices = formatCurrency(Number(first?.paid));
+    const totalPendingInvoices = formatCurrency(Number(first?.pending));
 
     return {
       numberOfCustomers,
