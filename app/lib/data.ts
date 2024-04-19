@@ -1,7 +1,6 @@
 import {
   CustomerField,
   CustomersTable,
-  InvoiceForm,
   InvoicesTable,
   LatestInvoiceRaw,
   User,
